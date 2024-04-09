@@ -1,0 +1,268 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum event_type { enrollment, deduction, recovery };
+
+struct mark_id {
+    unsigned int mark;
+    char* subject;
+};
+
+struct event {
+    enum event_type type;
+    char date[20];
+};
+
+typedef struct {
+    unsigned int card_id;
+    char* fio;
+    struct mark_id* marks;
+    struct event* events;
+    unsigned int mark_count;
+    unsigned int event_count;
+} student;
+
+int is_unique_id(student* students, unsigned int* students_count) {
+    for (int i = 0; i < *students_count - 1; i++)
+        if (students[*students_count - 1].card_id == students[i].card_id) return 0;
+    return 1;
+}
+
+void read_student(student* students, unsigned int* students_count) {
+    do {
+        printf("Введите номер зачетки: ");
+        scanf("%d", &students[*students_count - 1].card_id);
+    } while (is_unique_id(students, students_count) == 0);
+    printf("Введите ФИО: ");
+    char buf[1000];
+    scanf("%s", buf);
+    students[*students_count - 1].fio = malloc(strlen(buf) + 1);
+    strcpy(students[*students_count - 1].fio, buf);
+    printf("Введите количество дисциплин: ");
+    scanf("%d", &students[*students_count - 1].mark_count);
+    students[*students_count - 1].marks = malloc(students[*students_count - 1].mark_count * sizeof(struct mark_id));
+    for (int i = 0; i < students[*students_count - 1].mark_count; i++) {
+        printf("Введите название дисциплины(%d): ", i + 1);
+        scanf("%s", buf);
+        students[*students_count - 1].marks[i].subject = malloc(strlen(buf) + 1);
+        strcpy(students[*students_count - 1].marks[i].subject, buf);
+        printf("Введите отметку по данной дисциплине(%d): ", i + 1);
+        scanf("%d", &students[*students_count - 1].marks[i].mark);
+    }
+    printf("Введите количество событий: ");
+    scanf("%d", &students[*students_count - 1].event_count);
+    students[*students_count - 1].events = malloc(students[*students_count - 1].event_count * sizeof(struct event));
+    for (int i = 0; i < students[*students_count - 1].event_count; i++) {
+        int type_ev = -1;
+        while (type_ev < 1 || type_ev > 3) {
+            printf("1 - зачисление\n2 - отчисление\n3 - восстановление\nВыберите тип события(%d):", i + 1);
+            scanf("%d", &type_ev);
+        }
+        students[*students_count - 1].events[i].type = type_ev - 1;
+        printf("Введите дату события(%d): ", i + 1);
+        scanf("%s", buf);
+        strcpy(students[*students_count - 1].events[i].date, buf);
+    }
+}
+
+student* add_new_student(student* students, unsigned int* students_count) {
+    *students_count += 1;
+    students = realloc(students, *students_count * sizeof(student));
+    read_student(students, students_count);
+    return students;
+}
+
+void print_student(student studentt) {
+    printf("Номер зачетки: %d\n", studentt.card_id);
+    printf("ФИО: %s\n", studentt.fio);
+    printf("Отметки (название дисциплины, отметка по данной дисциплине): ");
+    for (int i = 0; i < studentt.mark_count; i++) {
+        printf("(%s, %d), ", studentt.marks[i].subject, studentt.marks[i].mark);
+    }
+    printf("\nСобытия (тип, дата): ");
+    for (int i = 0; i < studentt.event_count; i++) {
+        switch (studentt.events[i].type) {
+        case enrollment:
+            printf("(зачисление, %s), ", studentt.events[i].date);
+            break;
+        case deduction:
+            printf("(отчисление, %s), ", studentt.events[i].date);
+            break;
+        case recovery:
+            printf("(восстановление, %s), ", studentt.events[i].date);
+            break;
+        }
+    }
+    printf("\n");
+}
+
+void print_all_students(student* students, unsigned int* students_count) {
+    for (int i = 0; i < *students_count; i++) {
+        printf("-----------------------------------\n");
+        printf("SUDENT_INDEX: %d\n", i);
+        print_student(students[i]);
+    }
+    printf("-----------------------------------\n");
+}
+
+void save_data(student* students, unsigned int* students_count) {
+    FILE* f = fopen("students_data", "wb");
+    unsigned int len;
+    fwrite(students_count, sizeof(unsigned int), 1, f);
+    for (int i = 0; i < *students_count; i++) {
+        fwrite(&students[i].card_id, sizeof(unsigned int), 1, f);
+        len = strlen(students[i].fio) + 1;
+        fwrite(&len, sizeof(unsigned int), 1, f);
+        fwrite(students[i].fio, sizeof(char), len, f);
+        fwrite(&students[i].mark_count, sizeof(unsigned int), 1, f);
+        for (int j = 0; j < students[i].mark_count; j++) {
+            fwrite(&students[i].marks[j].mark, sizeof(unsigned int), 1, f);
+            len = strlen(students[i].marks[j].subject) + 1;
+            fwrite(&len, sizeof(unsigned int), 1, f);
+            fwrite(students[i].marks[j].subject, sizeof(char), len, f);
+        }
+        fwrite(&students[i].event_count, sizeof(unsigned int), 1, f);
+        fwrite(students[i].events, sizeof(struct event), students[i].event_count, f);
+    }
+
+    fclose(f);
+}
+
+student* init_data(unsigned int* students_count) {
+    FILE* f = fopen("students_data", "rb");
+    unsigned int len;
+    fread(students_count, sizeof(unsigned int), 1, f);
+    student* students = malloc(*students_count * sizeof(student));
+    for (int i = 0; i < *students_count; i++) {
+        fread(&students[i].card_id, sizeof(unsigned int), 1, f);
+        fread(&len, sizeof(unsigned int), 1, f);
+        students[i].fio = malloc(len * sizeof(char));
+        fread(students[i].fio, sizeof(char), len, f);
+        fread(&students[i].mark_count, sizeof(unsigned int), 1, f);
+        students[i].marks = malloc(students[i].mark_count * sizeof(struct mark_id));
+        for (int j = 0; j < students[i].mark_count; j++) {
+            fread(&students[i].marks[j].mark, sizeof(unsigned int), 1, f);
+            fread(&len, sizeof(unsigned int), 1, f);
+            students[i].marks[j].subject = malloc(len * sizeof(char));
+            fread(students[i].marks[j].subject, sizeof(char), len, f);
+        }
+        fread(&students[i].event_count, sizeof(unsigned int), 1, f);
+        students[i].events = malloc(students[i].event_count * sizeof(struct event));
+        fread(students[i].events, sizeof(struct event), students[i].event_count, f);
+    }
+    fclose(f);
+    return students;
+}
+
+double average_score(student studentt) {
+    unsigned int score = 0;
+    for (int i = 0; i < studentt.mark_count; i++) score += studentt.marks[i].mark;
+    return (double)score / (double)studentt.mark_count;
+}
+
+void find_30_pres_students(student* students, unsigned int* students_count) {
+    if (*students_count <= 0) {
+        return;
+    }
+    unsigned int stut_count = 0;
+    double max_score = 10000000.0;
+    while (*students_count * 0.3 >= stut_count) {
+        unsigned int cur_index = -1;
+        double max_score_cur = -1.0;
+        for (int i = 0; i < *students_count; i++) {
+            double t = average_score(students[i]);
+            if (t <= max_score && t >= max_score_cur) {
+                max_score_cur = t;
+                cur_index = i;
+            }
+        }
+        printf("-----------------------------------\n");
+        print_student(students[cur_index]);
+        max_score = max_score_cur;
+        stut_count += 1;
+    }
+    printf("-----------------------------------\n");
+}
+
+student* delete_student_from_index(student* students, unsigned int* students_count, unsigned int deleted_index) {
+    if (*students_count <= 0) {
+        return students;
+    }
+    free(students[deleted_index].fio);
+
+    for (int i = 0; i < students[deleted_index].mark_count; i++) {
+        free(students[deleted_index].marks[i].subject);
+    }
+    free(students[deleted_index].marks);
+    free(students[deleted_index].events);
+    for (int i = deleted_index; i < *students_count - 1; i++) {
+        students[i] = students[i + 1];
+    }
+
+    *students_count -= 1;
+    students = realloc(students, *students_count * sizeof(student));
+    return students;
+}
+
+student* deleta_sudent_with_max_events(student* students, unsigned int* students_count) {
+    if (*students_count <= 0) {
+        return students;
+    }
+    unsigned int del_index = -1;
+    unsigned int max_events = students[0].event_count;
+    for (int i = 1; i < *students_count; i++) {
+        if (students[i].event_count > max_events) {
+            max_events = students[i].event_count;
+            del_index = i;
+        }
+    }
+    while (1) {
+        students = delete_student_from_index(students, students_count, del_index);
+        int t = 0;
+        for (int i = 0; i < *students_count; i++) {
+            if (max_events == students[i].event_count) {
+                del_index = i;
+                t = 1;
+                break;
+            }
+        }
+        if (t == 0) break;
+    }
+
+    return students;
+}
+
+int task2() {
+    unsigned int students_count;
+    student* students = init_data(&students_count);
+    int type_task2 = -1;
+    while (type_task2 != 0) {
+        printf("0 - выйти из задания\n1 - добавить нового студента\n2 - удалить студента по индексу\n3 - показать всех студентов\n4 - найти 30%% наиболее успевающих (средний балл) студентов\n5 - удалить студентов с наиболее насыщенной (количество событий) историей обучения\nВыберите нужное действие: ");
+        scanf("%d", &type_task2);
+
+        if (type_task2 == 1) {
+            students = add_new_student(students, &students_count);
+            save_data(students, &students_count);
+        }
+        else if (type_task2 == 2) {
+            int del_index = -1;
+            while (del_index < 0 || del_index > students_count - 1) {
+                printf("Введите индекс студента: ");
+                scanf("%d", &del_index);
+            }
+            students = delete_student_from_index(students, &students_count, del_index);
+            save_data(students, &students_count);
+        }
+        else if (type_task2 == 3) {
+            print_all_students(students, &students_count);
+        }
+        else if (type_task2 == 4) {
+            find_30_pres_students(students, &students_count);
+        }
+        else if (type_task2 == 5) {
+            students = deleta_sudent_with_max_events(students, &students_count);
+            save_data(students, &students_count);
+        }
+    }
+}

@@ -99,22 +99,10 @@ void add_event(Student* student, const char* date, EventType type) {
     }
     new_node->key = my_strdup(date);
     new_node->value.type = type;
-    strncpy(new_node->value.date, date, DATE_SIZE - 1);
+    strncpy(new_node->value.date, date, DATE_SIZE);
     new_node->value.date[DATE_SIZE - 1] = '\0';  // Ensure null termination
-    new_node->next = NULL; // Initially, the new node does not point to any other node
-
-    // If the student has no events yet, add the new node as the first event
-    if (student->events == NULL) {
-        student->events = new_node;
-    }
-    else {
-        // Otherwise, add the new node to the end of the event list
-        EventNode* current = student->events;
-        while (current->next != NULL) {
-            current = current->next;
-        }
-        current->next = new_node;
-    }
+    new_node->next = student->events;
+    student->events = new_node;
 }
 
 void free_student_memory(Student* student) {
@@ -145,20 +133,6 @@ void free_hash_table() {
             student = student->next;
             free_student_memory(temp);
             free(temp);
-        }
-    }
-}
-
-int check_input() {
-    int input;
-    while (1) {
-        if (scanf("%d", &input) == 1) {
-            while (getchar() != '\n');
-            return input;
-        }
-        else {
-            printf("Неверный ввод. \nПожалуйста, введите целое число:");
-            while (getchar() != '\n');
         }
     }
 }
@@ -421,23 +395,24 @@ void sort_disciplines_by_average(Student* students, int num_students) {
     // Реализация сортировки дисциплин по среднему баллу
 }
 
-void case_add_student() {
-    Student* new_student = input_student();
-    if (new_student) {
-        add_student(new_student);
-    }
-}
-
 int main() {
     setlocale(LC_ALL, "Ru");
     load_students_from_file(FILE_NAME);
     while (1) {
         printf("0 - выйти\n1 - добавить студента\n2 - удалить студента\n3 - показать студентов\n4 - сортировать дисциплины\n5 - удалить студентов с плохими оценками\nВыберите действие: ");
-        int type_task2 = check_input();
+        int type_task2;
+        if (scanf("%d", &type_task2) != 1) {
+            fprintf(stderr, "Ошибка ввода действия\n");
+            break;
+        }
         if (type_task2 == 0) break;
         switch (type_task2) {
         case 1: {
-            case_add_student(); break;
+            Student* new_student = input_student();
+            if (new_student) {
+                add_student(new_student);
+            }
+            break;
         }
         case 2: {
             printf("Номер зачётки: ");
@@ -452,7 +427,8 @@ int main() {
         case 3: display_all_students(); break;
         case 4: /*sort_disciplines_by_average(students, num_students);*/ break; // Реализуйте эту функцию при необходимости
         case 5: remove_students_with_low_marks(); break;
-        default: fprintf(stderr, "Неверный ввод\n");
+        default:
+            fprintf(stderr, "Неверный ввод\n");
         }
         save_students(FILE_NAME);
     }
